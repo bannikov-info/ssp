@@ -3,6 +3,7 @@ var WebSocketClient = require('websocket').client
     ,events = require('events');
 
 module.exports.GameEventsSubscription = GameEventsSubscription;
+module.exports.getEventId = require("./ss-scrapper").getEventId;
 
 module.exports.subscribe = function (evId) {
   return new GameEventsSubscription(evId);

@@ -1,7 +1,9 @@
 var util = require('util')
     ,FSM = require('./lib/fsm').FSM
     ,FSMUnknownSymbolError = require('./lib/fsm').FSMUnknownSymbolError
-    ,GameSubscribeSession = require('./game-subscribe-sess');
+    ,GameSubscribeSession = require('./game-subscribe-sess')
+    ,validator = require('validator')
+    ,ssClient = require('./ss-client');
 
 module.exports = BotSession;
 
@@ -18,10 +20,12 @@ function BotSession(chatId, userId) {
       .addState({state: 'INIT',              symbol: 'START',                 next: 'W_COMMAND', action: this.init})
       .addState({state: 'W_COMMAND',         symbol: '*',                     next: 'W_COMMAND'})
       .addState({state: 'W_COMMAND',         symbol: 'HELP',                  next: 'W_COMMAND', action: this.show_help})
-      .addState({state: 'W_COMMAND',         symbol: 'START_TRACKING_P',      next: 'W_COMMAND', action: this.start_tracking})
       .addState({state: 'W_COMMAND',         symbol: 'START_TRACKING',        next: 'W_TRACKING_PARAMS', action: this.tracking_params_request})
-      .addState({state: 'W_COMMAND',         symbol: 'STOP_TRACKING_P',       next: 'W_COMMAND', action: this.stop_tracking})
+      // START_TRACKING с параметрами в одной строке
+      .addState({state: 'W_COMMAND',         symbol: 'START_TRACKING_P',      next: 'W_COMMAND', action: this.start_tracking})
       .addState({state: 'W_COMMAND',         symbol: 'STOP_TRACKING',         next: 'W_TRACKING_ID', action: this.tracking_id_request})
+      // STOP_TRACKING с параметрами в одной строке
+      .addState({state: 'W_COMMAND',         symbol: 'STOP_TRACKING_P',       next: 'W_COMMAND', action: this.stop_tracking})
       .addState({state: 'W_COMMAND',         symbol: 'STOP',                  next: 'INIT', action: this.halt})
       .addState({state: 'W_TRACKING_PARAMS', symbol: '*',                     next: 'W_TRACKING_PARAMS', action: this.tracking_params_request})
       .addState({state: 'W_TRACKING_PARAMS', symbol: 'HELP',                  next: 'W_TRACKING_PARAMS', action: this.show_help})
@@ -45,17 +49,28 @@ BotSession.prototype.normalize = function(symbol){
     raw    : symbol
   };
 
+  // Зависимые от состояния токены
+  if(isValidTrackingParams(symbol || '')){
+    ret.symbol = 'VALID_TRACKING_PARAMS';
+    ret.data = symbol;
+  }
+
+
+  // Токены, не зависимые от состояния
   var match = symbol.match(/^(\S+) ?(.+)?$/);
-  if(!!match){
+  if(!!match && (/^\*$/).test(ret.symbol)){
     ret.symbol = match[1].toUpperCase();
     ret.data   = match[2];
   }
 
-  if((ret.symbol === 'START_TRACKING') && (!util.isUndefined(ret.data))){
+  
+
+  // Токены, зависимы от толькочто найденых символов
+  if((ret.symbol === 'START_TRACKING') && (isValidTrackingParams(ret.data))){
     ret.symbol = 'START_TRACKING_P';
   };
 
-  if((ret.symbol === 'STOP_TRACKING') && (!util.isUndefined(ret.data))){
+  if((ret.symbol === 'STOP_TRACKING') && (isValidTrackingParams(ret.data))){
     ret.symbol = 'STOP_TRACKING_P';
   }
 
@@ -67,10 +82,35 @@ BotSession.prototype.doShowCurrentState = function () {
   this.emit('show-state', this);
 };
 
-BotSession.prototype.start_tracking = function () {
+BotSession.prototype.tracking_params_request = function (symbol) {
+  // body...
+  
+  this.emit('tracking-params-request', this);
+}
 
+BotSession.prototype.start_tracking = function (symbol) {
+  ssClient.getEventId(symbol.data, (err, evId) => {
+    if(err){
+      this.emit('start-tracking.fail', this);
+      this.emit('error', new Error('Не удалось извлеч id игры из "'+symbol.data+'"', this));
+      return;
+    }
+    
+    this.geSubscription = new ssClient.GameEventsSubscription(evId);
+    
+    var self = this;
+    this.geSubscription.on('data', function(data){
+      self.emit('game-event.data', data, this);
+    });
+    this.geSubscription.on('error', function(err){
+      self.emit('error', err, this);
+    })
+    this.geSubscription.start();
+    // this.emit('start-tracking.done', evId, this);
+    return;
+  });
 };
 
-function validateTrackingParams(param_str){
-  return validator.isURL(param_str, {protocols: ['http', 'https'], require_protocol: true});
+function isValidTrackingParams(param_str){
+  return validator.isURL(param_str || '', {protocols: ['http', 'https'], require_protocol: true});
 }

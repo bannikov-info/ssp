@@ -53,27 +53,47 @@ function buildBotDialog(chatId, userId) {
 
   bot_sess.on('show-state', onBotShowState.bind(bot, chatId));
 
-  bot_sess.on('game-sess-event', onGameSessEvent.bind(bot, chatId));
+  bot_sess.on('start-tracking.done', onStartTrackingDone.bind(bot, chatId));
+  bot_sess.on('start-tracking.fail', onStartTrackingFail.bind(bot, chatId));
+  
+  bot_sess.on('tracking-params-request', onTrackingParamsRequest.bind(bot, chatId));
+  
+  bot_sess.on('game-event.data', onGameEventData.bind(bot, chatId));
 
   return bot_sess;
 };
 
 function onShowHelp(chatId) {
-  this.sendMessage(chatId, 'Можно использовать следующие команды:\n stop, help, subscribe, exit');
+  // this.sendMessage(chatId, 'Можно использовать следующие команды:\n stop, help, subscribe, exit');
 };
 
 function onStateTransition(chatId, oldState, newState) {
   this.sendMessage(chatId, 'Произошла смена состояния:\n'+oldState+' >> '+newState);
 }
 
-function onBotSessionError(chatId, err) {
-  this.sendMessage(chatId, 'Произошла ошибка:\n'+err);
+function onBotSessionError(chatId, err, bot_sess) {
+  this.sendMessage(chatId, err.toString());
 }
 
-function onBotShowState(chatId, bot_dialog) {
-  this.sendMessage(chatId, bot_dialog.CURRENT_STATE);
+function onBotShowState(chatId, bot_sess) {
+  this.sendMessage(chatId, bot_sess.CURRENT_STATE);
 }
 
-function onGameSessEvent(chatId) {
-  this.sendMessage(chatId, util.inspect(arguments));
+function onStartTrackingDone(chatId, evId, bot_sess) {
+  // body...
+  this.sendMessage(chatId, util.format('Запущено отслеживание хода игры: %s', evId));
+}
+
+function onStartTrackingFail(chatId, err, bot_sess) {
+  // body...
+  this.sendMessage(chatId, "Не удалоь запустить отслеживание игры.");
+}
+
+function onTrackingParamsRequest(chatId, bot_sess) {
+  // body...
+  this.sendMessage(chatId, "Введите URL страницы игры");
+};
+
+function onGameEventData(chatId, data, bot_sess) {
+  this.sendMessage(chatId, JSON.stringify(data));
 }
