@@ -1,6 +1,7 @@
 var WebSocketClient = require('websocket').client
     ,argv = require('optimist').argv
-    ,events = require('events');
+    ,EventEmitter = require('events')
+    ,util = require('util');
 
 module.exports.GameEventsSubscription = GameEventsSubscription;
 module.exports.getEventId = require("./ss-scrapper").getEventId;
@@ -73,6 +74,5 @@ function GameEventsSubscription(evId){
     client.abort();
   }
 
-}
-
-GameEventsSubscription.prototype = new events();
+};
+util.inherits(GameEventsSubscription, EventEmitter);

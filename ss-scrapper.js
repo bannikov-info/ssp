@@ -5,21 +5,29 @@ var http = require('http')
 module.exports.getEventId = getEventId;
 
 function getEventId(url_str, cb){
-  cb = cb || ((err, id) => { if (err) {throw err;}});
-  var resp_cb = (resp) => {
-    var html = "";
-    resp.on('data', (chunk) => { html+=chunk; });
-    resp.on('end', () => {
-      try {
-        var id = html.match(/appKernel\.bootstrap\('Details\.Controller', \[(\d{7})\]\)/)[1];
-      } finally {
-        if(id === undefined) { return cb(new Error('id not found')) };
-      }
-      return cb(null, id);
-    });
-    resp.on('error', (err) => { cb(err); });
-  }
-  http.request(url_str, resp_cb).end();
+  var promise = new Promise(function (resolve, reject) {
+    cb = cb || ((err, id) => { if (err) {throw err;}});
+    var resp_cb = (resp) => {
+      var html = "";
+      resp.on('data', (chunk) => { html+=chunk; });
+      resp.on('end', () => {
+        try {
+          var id = html.match(/appKernel\.bootstrap\('Details\.Controller', \[(\d{7})\]\)/)[1];
+        } finally {
+          if(id === undefined) { return cb(new Error('id not found')) };
+        }
+        resolve(id);
+        return cb(null, id);
+      });
+      resp.on('error', (err) => {
+        reject(err);
+        cb(err);
+      });
+    }
+    http.request(url_str, resp_cb).end();
+  })
+
+  return promise;
 }
 
 if(!module.parent){

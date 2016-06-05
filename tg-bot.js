@@ -55,9 +55,9 @@ function buildBotDialog(chatId, userId) {
 
   bot_sess.on('start-tracking.done', onStartTrackingDone.bind(bot, chatId));
   bot_sess.on('start-tracking.fail', onStartTrackingFail.bind(bot, chatId));
-  
+
   bot_sess.on('tracking-params-request', onTrackingParamsRequest.bind(bot, chatId));
-  
+
   bot_sess.on('game-event.data', onGameEventData.bind(bot, chatId));
 
   return bot_sess;
@@ -95,5 +95,16 @@ function onTrackingParamsRequest(chatId, bot_sess) {
 };
 
 function onGameEventData(chatId, data, bot_sess) {
-  this.sendMessage(chatId, JSON.stringify(data));
+//   ITF мужчины
+// (Italy F13 singles)         : data.season.name
+// Игрок1 Игрок2 (Home - Away) : data.name
+// сет                         : data.statusDescription
+// счёт 4:3                    : data.homeScore.period[data.lastPeriod] : data.awayScore.period[data.lastPeriod]
+  this.sendMessage(chatId, util.format('%s\n%s\n%s\n%s:%s',
+                                          data.season.name,
+                                          data.name,
+                                          data.statusDescription,
+                                          data.homeScore.period[data.lastPeriod],
+                                          data.awayScore.period[data.lastPeriod]
+                                        ));
 }
